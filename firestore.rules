@@ -1,0 +1,256 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Bloqueio padrão global (Zero-Trust)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Auxiliares básicos
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.@]+$');
+    }
+
+    function hasAuthEmail() {
+      return isSignedIn() && request.auth.token.email != null;
+    }
+
+    function authEmailLower() {
+      return request.auth.token.email.lower();
+    }
+
+    // Bootstrap inicial: sistema ainda não possui configurações globais criadas
+    function isInitialSystemBootstrap() {
+      return !exists(/databases/$(database)/documents/system_settings/global);
+    }
+
+    // Administrador raiz bootstrap ou documento explícito em /admins/{uid}
+    function isBootstrapAdmin() {
+      return hasAuthEmail() &&
+        authEmailLower() == "silvagomesjoanderson2001@gmail.com" &&
+        request.auth.token.email_verified == true;
+    }
+
+    function userDocPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(userDocPath(request.auth.uid));
+    }
+
+    function currentUserDoc() {
+      return get(userDocPath(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && (
+        isBootstrapAdmin() ||
+        (hasUserDoc() && currentUserDoc().status == 'ATIVO')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isBootstrapAdmin() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (hasUserDoc() && currentUserDoc().status == 'ATIVO' && currentUserDoc().role == 'ADMIN')
+      );
+    }
+
+    function isSupervisorOrAdmin() {
+      return isAdmin() || (
+        hasUserDoc() &&
+        currentUserDoc().status == 'ATIVO' &&
+        currentUserDoc().role in ['SUPERVISOR', 'TST']
+      );
+    }
+
+    function isOperatorOrAbove() {
+      return isSupervisorOrAdmin() || (
+        hasUserDoc() &&
+        currentUserDoc().status == 'ATIVO' &&
+        currentUserDoc().role in ['OPERADOR', 'ALMOXARIFE']
+      );
+    }
+
+    // Validação de esquema: Extintor (alinhada com src/types/extinguisher.ts)
+    function isValidExtinguisher(data) {
+      return data.keys().hasAll([
+          'id', 'patrimonyNumber', 'type', 'capacity', 'manufacturer',
+          'serialNumber', 'locationArea', 'locationDetails',
+          'manufacturingDate', 'lastRechargeDate', 'nextMaintenanceDate',
+          'hydrostaticExpirationDate', 'operationalCondition',
+          'hasPressureGaugeNormal', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.patrimonyNumber is string && data.patrimonyNumber.size() > 0 && data.patrimonyNumber.size() <= 100 &&
+        data.type in ['ABC_PO', 'BC_PO', 'CO2', 'AGUA', 'ESPUMA'] &&
+        data.capacity is string && data.capacity.size() > 0 && data.capacity.size() <= 50 &&
+        data.manufacturer is string && data.manufacturer.size() <= 100 &&
+        data.serialNumber is string && data.serialNumber.size() <= 100 &&
+        data.locationArea in ['ESTOQUE', 'CAMPO'] &&
+        data.locationDetails is string && data.locationDetails.size() > 0 && data.locationDetails.size() <= 250 &&
+        data.manufacturingDate is string && data.manufacturingDate.size() <= 30 &&
+        data.lastRechargeDate is string && data.lastRechargeDate.size() <= 30 &&
+        data.nextMaintenanceDate is string && data.nextMaintenanceDate.size() <= 30 &&
+        data.hydrostaticExpirationDate is string && data.hydrostaticExpirationDate.size() <= 30 &&
+        data.operationalCondition in ['OPERACIONAL', 'EM_RECARGA', 'VAZIO', 'INTERDITADO', 'EM_QUARENTENA'] &&
+        data.hasPressureGaugeNormal is bool &&
+        data.createdAt is string && data.createdAt.size() <= 50 &&
+        data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    // Validação de esquema: Movimentação (alinhada com src/types/extinguisher.ts)
+    function isValidMovement(data) {
+      return data.keys().hasAll([
+          'id', 'date', 'time', 'timestamp', 'extinguisherId',
+          'extinguisherPatrimony', 'extinguisherType', 'movementType',
+          'originLocation', 'destinationLocation', 'responsibleUserId',
+          'responsibleUserName', 'notes'
+        ]) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.date is string && data.date.size() <= 20 &&
+        data.time is string && data.time.size() <= 20 &&
+        data.timestamp is number &&
+        data.extinguisherId is string && data.extinguisherId.size() > 0 && data.extinguisherId.size() <= 128 &&
+        data.extinguisherPatrimony is string && data.extinguisherPatrimony.size() <= 100 &&
+        data.extinguisherType in ['ABC_PO', 'BC_PO', 'CO2', 'AGUA', 'ESPUMA'] &&
+        data.movementType in ['ENTRADA_ESTOQUE', 'SAIDA_CAMPO', 'RETORNO_ESTOQUE', 'ENVIO_RECARGA', 'RETORNO_RECARGA', 'UTILIZACAO', 'INTERDICAO'] &&
+        data.originLocation is string && data.originLocation.size() <= 250 &&
+        data.destinationLocation is string && data.destinationLocation.size() <= 250 &&
+        data.responsibleUserId is string && data.responsibleUserId.size() <= 128 &&
+        data.responsibleUserName is string && data.responsibleUserName.size() <= 150 &&
+        data.notes is string && data.notes.size() <= 1000;
+    }
+
+    // Validação de esquema: Unidade
+    function isValidUnit(data) {
+      return data.keys().hasAll(['id', 'name', 'code', 'city', 'state', 'address', 'createdAt']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+        data.code is string && data.code.size() > 0 && data.code.size() <= 30 &&
+        data.city is string && data.city.size() <= 100 &&
+        data.state is string && data.state.size() <= 5 &&
+        data.address is string && data.address.size() <= 250 &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // Validação de esquema: Usuário (proíbe armazenar senha em texto puro)
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role', 'status', 'department', 'createdAt']) &&
+        !data.keys().hasAny(['password', 'plainPassword']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+        data.email is string && data.email.size() > 3 && data.email.size() <= 150 &&
+        data.role in ['ADMIN', 'SUPERVISOR', 'OPERADOR', 'CONSULTA', 'TST', 'ALMOXARIFE', 'INSPETOR'] &&
+        data.status in ['ATIVO', 'BLOQUEADO', 'PENDENTE'] &&
+        data.department is string && data.department.size() <= 150 &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // Coleção: Extintores
+    match /extinguishers/{extinguisherId} {
+      allow read: if isActiveUser();
+      allow create: if isOperatorOrAbove() && isValidId(extinguisherId) && isValidExtinguisher(incoming());
+      allow update: if isValidId(extinguisherId) && isValidExtinguisher(incoming()) && (
+        isAdmin() ||
+        (isSupervisorOrAdmin() && !incoming().diff(existing()).affectedKeys().hasAny(['id', 'createdAt', 'isArchived', 'archivedAt', 'archivedReason', 'archivedBy'])) ||
+        (isOperatorOrAbove() && incoming().diff(existing()).affectedKeys().hasOnly(['locationArea', 'locationDetails', 'operationalCondition', 'lastRechargeDate', 'nextMaintenanceDate', 'hasPressureGaugeNormal', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Coleção: Movimentações (Log de auditoria estritamente imutável - ABNT NBR 12962)
+    match /movements/{movementId} {
+      allow read: if isActiveUser();
+      allow create: if isOperatorOrAbove() && isValidId(movementId) && isValidMovement(incoming());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Coleção: Unidades Operacionais
+    match /units/{unitId} {
+      allow read: if isActiveUser();
+      allow create, update: if isSupervisorOrAdmin() && isValidId(unitId) && isValidUnit(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Coleção: Usuários & Perfis RBAC
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        userId == request.auth.uid ||
+        isAdmin() ||
+        isActiveUser() ||
+        (hasAuthEmail() && existing().email.lower() == authEmailLower())
+      );
+
+      allow create: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
+        isAdmin() ||
+        // Bootstrap do primeiro administrador caso o projeto esteja recém-criado
+        (userId == request.auth.uid && isInitialSystemBootstrap() && incoming().role == 'ADMIN' && incoming().status == 'ATIVO') ||
+        // Usuário aceitando pré-autorização criada previamente pelo Administrador em /user_invites/{email}
+        (userId == request.auth.uid && hasAuthEmail() &&
+          exists(/databases/$(database)/documents/user_invites/$(authEmailLower())) &&
+          incoming().role == get(/databases/$(database)/documents/user_invites/$(authEmailLower())).data.role &&
+          incoming().status == get(/databases/$(database)/documents/user_invites/$(authEmailLower())).data.status)
+      );
+
+      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
+        isAdmin() ||
+        // Usuário pode apenas atualizar seu próprio último acesso (lastLoginAt) e vínculo de UID, sem jamais alterar perfil ou status
+        (userId == request.auth.uid &&
+          incoming().role == existing().role &&
+          incoming().status == existing().status &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastLoginAt', 'firebaseUid', 'authProvider', 'avatarUrl']))
+      );
+
+      allow delete: if isAdmin() && userId != request.auth.uid;
+    }
+
+    // Coleção: Pré-autorizações por e-mail (para vinculação segura no primeiro login)
+    match /user_invites/{emailKey} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        (hasAuthEmail() && emailKey == authEmailLower())
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Coleção: Administradores (opcional para elevação explícita via Console)
+    match /admins/{adminUid} {
+      allow read: if isSignedIn() && (adminUid == request.auth.uid || isAdmin());
+      allow write: if false; // Gerenciado apenas via Firebase Console ou Admin SDK no backend
+    }
+
+    // Coleção: Configurações Globais do Sistema
+    match /system_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        (settingId == 'global' && isInitialSystemBootstrap())
+      );
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Documento de verificação de conexão
+    match /test/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "entities": {
+    "Extinguisher": {
+      "title": "Extinguisher",
+      "description": "Equipamento extintor de incêndio com identificação patrimonial e controle normativo ABNT NBR 12962",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Identificação única individual (ex: EXT-001)" },
+        "patrimonyNumber": { "type": "string", "maxLength": 100, "description": "Número patrimonial do ativo (ex: PAT-2024-001)" },
+        "type": { "type": "string", "enum": ["ABC_PO", "BC_PO", "CO2", "AGUA", "ESPUMA"], "description": "Tipo de agente extintor" },
+        "capacity": { "type": "string", "maxLength": 50, "description": "Capacidade nominal (ex: 6 kg, 10 L)" },
+        "manufacturer": { "type": "string", "maxLength": 100, "description": "Fabricante credenciado" },
+        "serialNumber": { "type": "string", "maxLength": 100, "description": "Número de série do cilindro" },
+        "locationArea": { "type": "string", "enum": ["ESTOQUE", "CAMPO"], "description": "Área física principal (Estoque ou Campo)" },
+        "locationDetails": { "type": "string", "maxLength": 250, "description": "Localização física detalhada" },
+        "manufacturingDate": { "type": "string", "format": "date", "description": "Data de fabricação (YYYY-MM-DD)" },
+        "lastRechargeDate": { "type": "string", "format": "date", "description": "Data da última recarga (YYYY-MM-DD)" },
+        "nextMaintenanceDate": { "type": "string", "format": "date", "description": "Próxima inspeção / manutenção Nível 2 (YYYY-MM-DD)" },
+        "hydrostaticExpirationDate": { "type": "string", "format": "date", "description": "Vencimento do ensaio hidrostático Nível 3 (YYYY-MM-DD)" },
+        "operationalCondition": { "type": "string", "enum": ["OPERACIONAL", "EM_RECARGA", "VAZIO", "INTERDITADO", "EM_QUARENTENA"], "description": "Condição operacional do equipamento" },
+        "photoUrl": { "type": "string", "maxLength": 2000, "description": "URL ou referência da fotografia do extintor" },
+        "sealNumber": { "type": "string", "maxLength": 100, "description": "Número do lacre de segurança" },
+        "hasPressureGaugeNormal": { "type": "boolean", "description": "Indica se o manômetro está na faixa verde" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Observações técnicas" },
+        "isArchived": { "type": "boolean", "description": "Indicador de arquivamento para preservação histórica" },
+        "archivedAt": { "type": "string", "format": "date-time", "description": "Data e hora do arquivamento" },
+        "archivedReason": { "type": "string", "maxLength": 500, "description": "Motivo do arquivamento" },
+        "archivedBy": { "type": "string", "maxLength": 150, "description": "Responsável pelo arquivamento" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp de criação" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp da última atualização" }
+      },
+      "required": ["id", "patrimonyNumber", "type", "capacity", "manufacturer", "serialNumber", "locationArea", "locationDetails", "manufacturingDate", "lastRechargeDate", "nextMaintenanceDate", "hydrostaticExpirationDate", "operationalCondition", "hasPressureGaugeNormal", "createdAt", "updatedAt"]
+    },
+    "Movement": {
+      "title": "Movement",
+      "description": "Registro auditável e imutável de movimentação patrimonial e operacional",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Identificador único da movimentação" },
+        "date": { "type": "string", "format": "date", "description": "Data da movimentação (YYYY-MM-DD)" },
+        "time": { "type": "string", "maxLength": 10, "description": "Hora da movimentação (HH:mm)" },
+        "timestamp": { "type": "number", "description": "Timestamp numérico em milissegundos" },
+        "extinguisherId": { "type": "string", "maxLength": 128, "description": "Identificador do extintor" },
+        "extinguisherPatrimony": { "type": "string", "maxLength": 100, "description": "Número patrimonial no momento da movimentação" },
+        "extinguisherType": { "type": "string", "enum": ["ABC_PO", "BC_PO", "CO2", "AGUA", "ESPUMA"], "description": "Tipo do extintor" },
+        "movementType": { "type": "string", "enum": ["ENTRADA_ESTOQUE", "SAIDA_CAMPO", "RETORNO_ESTOQUE", "ENVIO_RECARGA", "RETORNO_RECARGA", "UTILIZACAO", "INTERDICAO"], "description": "Tipo de movimentação" },
+        "originLocation": { "type": "string", "maxLength": 250, "description": "Local de origem" },
+        "destinationLocation": { "type": "string", "maxLength": 250, "description": "Local de destino" },
+        "responsibleUserId": { "type": "string", "maxLength": 128, "description": "ID do usuário responsável" },
+        "responsibleUserName": { "type": "string", "maxLength": 150, "description": "Nome do usuário responsável" },
+        "incidentDescription": { "type": "string", "maxLength": 1000, "description": "Descrição de ocorrência em uso" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Observações obrigatórias" }
+      },
+      "required": ["id", "date", "time", "timestamp", "extinguisherId", "extinguisherPatrimony", "extinguisherType", "movementType", "originLocation", "destinationLocation", "responsibleUserId", "responsibleUserName", "notes"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Cadastro de usuário com perfil RBAC vinculado ao Firebase Authentication",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Identificador do documento (UID do Firebase Auth ou ID de pré-cadastro)" },
+        "firebaseUid": { "type": "string", "maxLength": 128, "description": "UID autenticado no Firebase Auth" },
+        "authProvider": { "type": "string", "enum": ["password", "google.com", "local"], "description": "Provedor de autenticação" },
+        "name": { "type": "string", "maxLength": 150, "description": "Nome completo" },
+        "email": { "type": "string", "maxLength": 150, "description": "E-mail corporativo" },
+        "role": { "type": "string", "enum": ["ADMIN", "SUPERVISOR", "OPERADOR", "CONSULTA", "TST", "ALMOXARIFE", "INSPETOR"], "description": "Perfil de acesso RBAC" },
+        "status": { "type": "string", "enum": ["ATIVO", "BLOQUEADO", "PENDENTE"], "description": "Situação cadastral" },
+        "department": { "type": "string", "maxLength": 150, "description": "Departamento / setor" },
+        "authorizedUnitIds": { "type": "array", "description": "Lista de IDs de unidades autorizadas" },
+        "avatarUrl": { "type": "string", "maxLength": 500, "description": "URL do avatar" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de cadastro" },
+        "lastLoginAt": { "type": "string", "format": "date-time", "description": "Último acesso" }
+      },
+      "required": ["id", "name", "email", "role", "status", "department", "createdAt"]
+    },
+    "Unit": {
+      "title": "Unit",
+      "description": "Unidade operacional ou filial gerenciada",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Identificador da unidade" },
+        "name": { "type": "string", "maxLength": 150, "description": "Nome da unidade" },
+        "code": { "type": "string", "maxLength": 30, "description": "Sigla / código da unidade" },
+        "city": { "type": "string", "maxLength": 100, "description": "Cidade" },
+        "state": { "type": "string", "maxLength": 2, "description": "UF" },
+        "address": { "type": "string", "maxLength": 250, "description": "Endereço" },
+        "responsibleTst": { "type": "string", "maxLength": 150, "description": "Responsável técnico" },
+        "phone": { "type": "string", "maxLength": 40, "description": "Telefone" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de cadastro" }
+      },
+      "required": ["id", "name", "code", "city", "state", "address", "createdAt"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Configurações globais corporativas e normativas do sistema",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "maxLength": 200, "description": "Razão Social" },
+        "cnpj": { "type": "string", "maxLength": 30, "description": "CNPJ" },
+        "sesmtDepartment": { "type": "string", "maxLength": 200, "description": "Departamento SESMT" },
+        "minTechnicalReservePercent": { "type": "number", "description": "Reserva técnica mínima (%)" },
+        "maintenanceAlertWindowDays": { "type": "number", "description": "Antecedência de alertas (dias)" },
+        "autoSyncFirestore": { "type": "boolean", "description": "Sincronização automática em tempo real" }
+      },
+      "required": ["companyName", "minTechnicalReservePercent", "maintenanceAlertWindowDays", "autoSyncFirestore"]
+    }
+  },
+  "firestore": {
+    "/extinguishers/{extinguisherId}": {
+      "schema": "Extinguisher",
+      "description": "Extintores de incêndio cadastrados e sincronizados em tempo real"
+    },
+    "/movements/{movementId}": {
+      "schema": "Movement",
+      "description": "Histórico auditável e imutável de movimentações"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfis de acesso RBAC vinculados ao Firebase Auth"
+    },
+    "/user_invites/{email}": {
+      "schema": "User",
+      "description": "Pré-autorizações de usuários por e-mail criadas pelo Administrador"
+    },
+    "/units/{unitId}": {
+      "schema": "Unit",
+      "description": "Unidades operacionais e filiais"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "SystemSettings",
+      "description": "Parâmetros globais do Extintores Manager"
+    }
+  }
+}

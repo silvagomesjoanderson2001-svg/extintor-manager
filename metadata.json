@@ -1,0 +1,6 @@
+{
+  "name": "Extintores Manager",
+  "description": "Sistema profissional de gerenciamento, controle patrimonial, estoque e movimentação de extintores de incêndio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
